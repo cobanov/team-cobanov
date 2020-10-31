@@ -6,4 +6,4 @@ listesine hoşgeldiniz.
 ## Katkıda Bulunanlar
 Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncelleyin :)
 
-[Mert Cobanoglu](https://github.com/metover)
+[İrem Kurt](https://github.com/violettance)

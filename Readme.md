@@ -9,5 +9,5 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Mert Cobanoglu](https://github.com/metover)
 * [Melih Akpinar](https://github.com/melihakpinar)
 * [Ufuk Mert Çelik](https://github.com/UMC25)
-
+* [Leyla Tülü](https://github.com/leylatulu)
 

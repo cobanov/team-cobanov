@@ -7,3 +7,4 @@ listesine hoşgeldiniz.
 Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncelleyin :)
 
 [Mert Cobanoglu](https://github.com/metover)
+[Leyla Tülü](https://github.com/leylatulu)

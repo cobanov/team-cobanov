@@ -11,4 +11,5 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Melih Akpinar](https://github.com/melihakpinar)
 * [Ufuk Mert Çelik](https://github.com/UMC25)
 * [Leyla Tülü](https://github.com/leylatulu)
+* [Şükrücan Cebeci](https://github.com/sukrucnCbc)
 

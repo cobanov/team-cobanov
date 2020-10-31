@@ -18,5 +18,4 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Hakan MAZI](https://github.com/HAKANMAZI)
 * [Mücahid AYDİN](https://github.com/MucahidAydin)
 * [Mustafa Dirier](https://github.com/mustod)
-
-
+* [İrem Uzun](https://github.com/iremuzun)

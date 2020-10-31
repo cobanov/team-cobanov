@@ -1,5 +1,5 @@
 # Cobanov-Team Katkıda Bulun
-Merhabalar, bu repo ile Youtube'da [videosunu]() 
+Merhabalar, bu repo ile Youtube'da [videosunu](https://www.youtube.com/watch?v=N_qEmSRsFlI) 
 çekmiş olduğum GitHub'da nasıl pull request/contributions yapacağını anlattığım katkıda 
 listesine hoşgeldiniz. 
 

@@ -15,3 +15,6 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Taner Ant](https://github.com/tanerant)
 * [Selman Baskaya](https://github.com/selmanbaskaya)
 * [Mahmut SAZLIK](https://github.com/mahmutsazlik)
+* [Hakan MAZI](https://github.com/HAKANMAZI)
+* [Mücahid AYDİN](https://github.com/MucahidAydin)
+

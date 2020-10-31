@@ -6,5 +6,8 @@ listesine hoşgeldiniz.
 ## Katkıda Bulunanlar
 Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncelleyin :)
 
-[Mert Cobanoglu](https://github.com/metover)
-[Melih Akpinar](https://github.com/melihakpinar)
+* [Mert Cobanoglu](https://github.com/metover)
+* [Melih Akpinar](https://github.com/melihakpinar)
+* [Ufuk Mert Çelik](https://github.com/UMC25)
+
+

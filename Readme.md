@@ -1,5 +1,5 @@
 # Cobanov-Team Katkıda Bulun
-Merhabalar, bu repo ile Youtube'da [videosunu]() 
+Merhabalar, bu repo ile Youtube'da [videosunu](https://www.youtube.com/watch?v=N_qEmSRsFlI) 
 çekmiş olduğum GitHub'da nasıl pull request/contributions yapacağını anlattığım katkıda 
 listesine hoşgeldiniz. 
 
@@ -13,5 +13,5 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Leyla Tülü](https://github.com/leylatulu)
 * [Şükrücan Cebeci](https://github.com/sukrucnCbc)
 * [Taner Ant](https://github.com/tanerant)
-* [Hakan MAZI](https://github.com/HAKANMAZI)
+* [Selman Baskaya](https://github.com/selmanbaskaya)
 * [Mahmut SAZLIK](https://github.com/mahmutsazlik)

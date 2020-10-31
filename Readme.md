@@ -7,3 +7,5 @@ listesine hoşgeldiniz.
 Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncelleyin :)
 
 [Mert Cobanoglu](https://github.com/metover)
+[Şükrücan Cebeci](https://github.com/sukrucnCbc)
+

@@ -12,4 +12,5 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Ufuk Mert Çelik](https://github.com/UMC25)
 * [Leyla Tülü](https://github.com/leylatulu)
 * [Şükrücan Cebeci](https://github.com/sukrucnCbc)
+* [Taner Ant](https://github.com/tanerant)
 

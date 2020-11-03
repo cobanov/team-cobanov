@@ -23,4 +23,4 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Can Argın](https://github.com/nigranac)
 * [Emre Aydınsoy](https://github.com/aydinsoyemre)
 * [Şükrü Bakar](https://github.com/sukrubakar)
-
+* [Mert Bozkır](https://github.com/mertbozkir)

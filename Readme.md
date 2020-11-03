@@ -22,3 +22,5 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Oğuzhan Şahin](https://github.com/oguuzhansahin)
 * [Can Argın](https://github.com/nigranac)
 * [Emre Aydınsoy](https://github.com/aydinsoyemre)
+* [Şükrü Bakar](https://github.com/sukrubakar)
+

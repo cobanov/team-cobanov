@@ -24,3 +24,5 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Emre Aydınsoy](https://github.com/aydinsoyemre)
 * [Şükrü Bakar](https://github.com/sukrubakar)
 * [Mert Bozkır](https://github.com/mertbozkir)
+* [Sinan Odabaşı](https://github.com/kafasin)
+

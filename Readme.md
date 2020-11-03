@@ -21,3 +21,4 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [İrem Uzun](https://github.com/iremuzun)
 * [Oğuzhan Şahin](https://github.com/oguuzhansahin)
 * [Can Argın](https://github.com/nigranac)
+* [Emre Aydınsoy](https://github.com/aydinsoyemre)

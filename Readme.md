@@ -20,4 +20,7 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Mustafa Dirier](https://github.com/mustod)
 * [İrem Uzun](https://github.com/iremuzun)
 * [Oğuzhan Şahin](https://github.com/oguuzhansahin)
+* [Can Argın](https://github.com/nigranac)
+* [Emre Aydınsoy](https://github.com/aydinsoyemre)
+* [Şükrü Bakar](https://github.com/sukrubakar)
 * [Mert Bozkır](https://github.com/mertbozkir)

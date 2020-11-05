@@ -28,4 +28,6 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [İbrahim Yahya AYDINLI](https://github.com/ibrahimyahyaaydinli)
 * [Handan Altuner](https://github.com/handanaltuner)
 * [Nedim ŞAHİN](https://github.com/Nedim-Sahin)
+* [Oya Uysal Kog] (https://github.com/oyauysalkog)
+
 

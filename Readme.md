@@ -31,3 +31,4 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Oya Uysal Kog](https://github.com/oyauysalkog)
 * [Sezen Duygu Ceren](https://github.com/duyguceren)
 * [Dila Yapıcı](https://github.com/dilayapici)
+* [Ozgur Ersoz](https://github.com/ersozo)

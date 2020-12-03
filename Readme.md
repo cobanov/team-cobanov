@@ -30,4 +30,6 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Nedim ŞAHİN](https://github.com/Nedim-Sahin)
 * [Oya Uysal Kog](https://github.com/oyauysalkog)
 * [Sezen Duygu Ceren](https://github.com/duyguceren)
+* [Dila Yapıcı](https://github.com/dilayapici)
+* [Ozgur Ersoz](https://github.com/ersozo)
 * [Ongun Boşnak](https://github.com/ongunbosnak)

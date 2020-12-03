@@ -32,3 +32,4 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Sezen Duygu Ceren](https://github.com/duyguceren)
 * [Dila Yapıcı](https://github.com/dilayapici)
 * [Ozgur Ersoz](https://github.com/ersozo)
+* [Ongun Boşnak](https://github.com/ongunbosnak)

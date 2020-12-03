@@ -35,4 +35,5 @@ Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncell
 * [Ongun Boşnak](https://github.com/ongunbosnak)
 * [Cengiz Cemal Mataracı](https://github.com/cengizcmataraci)
 * [Muhammed KARTAL](https://github.com/MuhammedKartal1)
+* [Meftun Akarsu](https://github.com/mftnakrsu)
 

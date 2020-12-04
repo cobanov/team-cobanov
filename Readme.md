@@ -1,10 +1,16 @@
-﻿# Cobanov-Team Katkıda Bulun
+﻿# Cobanov-Team Contributions
+
+Participants learn how to do pull requests in this repo and do their first PR :)
+
+> Katılımcılar bu repoda nasıl pull request yapacaklarını öğrenirler ve ilk PR'larını atarlar :)
+ 
 Merhabalar, bu repo ile Youtube'da [videosunu](https://www.youtube.com/watch?v=N_qEmSRsFlI)
 çekmiş olduğum GitHub'da nasıl pull request/contributions yapacağını anlattığım katkıda
 listesine hoşgeldiniz.
 
-## Katkıda Bulunanlar
-Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncelleyin :)
+## Contributors
+Please update your name to be appended last in the format it should be :)
+> Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncelleyin :)
 
 * [Mert Cobanoglu](https://github.com/metover)
 * [İrem Kurt](https://github.com/violettance)

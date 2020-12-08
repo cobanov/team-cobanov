@@ -3,7 +3,7 @@
 Participants learn how to do pull requests in this repo and do their first PR :)
 
 > Katılımcılar bu repoda nasıl pull request yapacaklarını öğrenirler ve ilk PR'larını atarlar :)
- 
+
 Merhabalar, bu repo ile Youtube'da [videosunu](https://www.youtube.com/watch?v=N_qEmSRsFlI)
 çekmiş olduğum GitHub'da nasıl pull request/contributions yapacağını anlattığım katkıda
 listesine hoşgeldiniz.
@@ -45,3 +45,4 @@ Please update your name to be appended last in the format it should be :)
 * [Mavi Barış Şallı](https://github.com/mavisalli)
 * [İbrahim Yıldırım](https://github.com/brhmyldrm01)
 * [Şeyma Göksel](https://github.com/seymagoksel)
+* [Samet Çelik](https://github.com/SametCe)

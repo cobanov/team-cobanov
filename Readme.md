@@ -45,5 +45,5 @@ Please update your name to be appended last in the format it should be :)
 * [Mavi Barış Şallı](https://github.com/mavisalli)
 * [İbrahim Yıldırım](https://github.com/brhmyldrm01)
 * [Şeyma Göksel](https://github.com/seymagoksel)
+* [Erdal Güzel](https://github.com/erdalguzel)
 * [Eyyup Sayılır](https://github.com/eypsay)
-

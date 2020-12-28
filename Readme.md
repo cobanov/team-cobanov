@@ -44,4 +44,6 @@ Please update your name to be appended last in the format it should be :)
 * [Meftun Akarsu](https://github.com/mftnakrsu)
 * [Mavi Barış Şallı](https://github.com/mavisalli)
 * [İbrahim Yıldırım](https://github.com/brhmyldrm01)
+* [Şeyma Göksel](https://github.com/seymagoksel)
 * [Eyyup Sayılır](https://github.com/eypsay)
+

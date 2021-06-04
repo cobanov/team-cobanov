@@ -1,4 +1,4 @@
-﻿# Cobanov-Team Contributions
+# Cobanov-Team Contributions
 
 Participants learn how to do pull requests in this repo and do their first PR :)
 
@@ -50,3 +50,4 @@ Please update your name to be appended last in the format it should be :)
 * [Emir Mertoğlu](https://github.com/emirxmertoglu)
 * [Abdullah Enes Can](https://github.com/aec2)
 * [Mert Yiğittop](https://github.com/yigittopm)
+* [Eren Önal](https://github.com/erenonal)

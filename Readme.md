@@ -1,4 +1,5 @@
 ﻿# Cobanov-Team Contributions
+ ## Arkadaşlar daha fazla pr kabul edemiyorum çok arttı, haliyle öncekilerle conflict oluyor, otomatize etmeyi bilen birisi varsa benimle iletişime geçsin 😅
 
 Participants learn how to do pull requests in this repo and do their first PR :)
 

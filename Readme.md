@@ -1,16 +1,19 @@
 ﻿# Cobanov-Team Contributions
- ## Arkadaşlar daha fazla pr kabul edemiyorum çok arttı, haliyle öncekilerle conflict oluyor, otomatize etmek isteyen biri varsa benimle iletişime gecebilir 😅
+
+## Arkadaşlar daha fazla pr kabul edemiyorum çok arttı, haliyle öncekilerle conflict oluyor, otomatize etmek isteyen biri varsa benimle iletişime gecebilir 😅
 
 Participants learn how to do pull requests in this repo and do their first PR :)
 
 > Katılımcılar bu repoda nasıl pull request yapacaklarını öğrenirler ve ilk PR'larını atarlar :)
- 
+
 Merhabalar, bu repo ile Youtube'da [videosunu](https://www.youtube.com/watch?v=N_qEmSRsFlI)
 çekmiş olduğum GitHub'da nasıl pull request/contributions yapacağını anlattığım katkıda
 listesine hoşgeldiniz.
 
 ## Contributors
+
 Please update your name to be appended last in the format it should be :)
+
 > Lütfen isminizi olması gerektiği formatta en sona eklenecek şekilde güncelleyin :)
 
 * [Mert Cobanoglu](https://github.com/metover)
@@ -51,3 +54,4 @@ Please update your name to be appended last in the format it should be :)
 * [Emir Mertoğlu](https://github.com/emirxmertoglu)
 * [Abdullah Enes Can](https://github.com/aec2)
 * [Mert Yiğittop](https://github.com/yigittopm)
+* Hüseyin BATTAL

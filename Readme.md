@@ -7,7 +7,7 @@ Participants learn how to do pull requests in this repo and do their first PR :)
  
 Merhabalar, bu repo ile Youtube'da [videosunu](https://www.youtube.com/watch?v=N_qEmSRsFlI)
 çekmiş olduğum GitHub'da nasıl pull request/contributions yapacağını anlattığım katkıda
-listesine hoşgeldiniz.
+listesine hoşgeldiniz.eray
 
 ## Contributors
 Please update your name to be appended last in the format it should be :)

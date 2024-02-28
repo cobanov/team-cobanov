@@ -1,4 +1,4 @@
-﻿# Cobanov-Team Contributions
+# Cobanov-Team Contributions
  ## Arkadaşlar daha fazla pr kabul edemiyorum çok arttı, haliyle öncekilerle conflict oluyor, otomatize etmek isteyen biri varsa benimle iletişime gecebilir 😅
 
 Participants learn how to do pull requests in this repo and do their first PR :)
@@ -51,3 +51,4 @@ Please update your name to be appended last in the format it should be :)
 * [Emir Mertoğlu](https://github.com/emirxmertoglu)
 * [Abdullah Enes Can](https://github.com/aec2)
 * [Mert Yiğittop](https://github.com/yigittopm)
+* [Kerem Demir](https://github.com/keremdemirios)

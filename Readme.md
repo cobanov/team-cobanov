@@ -52,3 +52,18 @@ Please update your name to be appended last in the format it should be :)
 * [Abdullah Enes Can](https://github.com/aec2)
 * [Mert Yiğittop](https://github.com/yigittopm)
 * [Hakan CERAN](https://github.com/hakanceran64)
+
+## 📊 Kod İstatistikleri
+
+<!-- ceran-loc:start -->
+> Kaynak: `ceran-loc v1.3.0` · git (.gitignore uygulandı) · 2026-08-23
+> Hariç: ceran-loc
+
+| Dosya | Kod | Yorum | Boş | Toplam |
+|---:|---:|---:|---:|---:|
+| 1 | **58** | 2 | 9 | 69 |
+
+| Uzantı | Kod | Yorum | Boş | Dosya | Pay |
+|---|---:|---:|---:|---:|---:|
+| `.md` | 58 | 2 | 9 | 1 | %100 |
+<!-- ceran-loc:end -->

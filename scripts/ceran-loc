@@ -1,0 +1,778 @@
+#!/usr/bin/env bash
+#
+# ceran-loc — proje kod satırı analizi (kod / yorum / boş ayrımıyla)
+#
+# Purpose: Bir dizindeki kaynak dosyaları sayar; uzantı bazlı dağılım, en büyük
+#          dosyalar ve CI için eşik kapısı üretir.
+# Input:   argümanlar (bkz. --help); dizin varsayılan "."
+# Output:  stdout: rapor (table|csv|json|md); stderr: uyarı ve eşik ihlalleri
+# Exit:    0 başarılı · 1 kullanım/ortam hatası · 2 eşik aşıldı
+#
+# Uyum: bash 3.2 (stock macOS) ve POSIX awk. bash 4 özelliği kullanılmaz.
+#
+# Sözleşme ve tasarım notları: ../README.md
+
+set -euo pipefail
+
+readonly VERSION="1.3.0"
+readonly MD_START="<!-- ceran-loc:start -->"
+readonly MD_END="<!-- ceran-loc:end -->"
+readonly EXIT_USAGE=1
+readonly EXIT_THRESHOLD=2
+
+# ── Varsayılanlar ─────────────────────────────────────────────────────────────
+ROOT_DIR="."
+EXCLUDES=()
+FILTER_EXTS=()
+TOP_N=10
+SORT_BY="lines"
+GROUP_BY="ext"
+GROUP_DEPTH=1
+USE_COLOR=true
+FORMAT="table"
+OUTPUT=""
+USE_GIT=true
+INCLUDE_IGNORED=false
+QUIET=false
+MAX_FILE_LINES=0
+MAX_TOTAL_LINES=0
+
+# Kaynak dosya olmadığı kesin olanlar. Git modunda çoğu zaten .gitignore'da;
+# liste --no-git yolunu ve repo dışı dizinleri korur.
+DEFAULT_EXCLUDES=(
+  .git .svn .hg node_modules __pycache__ .pytest_cache .mypy_cache .ruff_cache
+  .tox venv .venv env dist build out target .next .nuxt .parcel-cache coverage
+  .gradle .idea .vscode Pods DerivedData .dart_tool .terraform
+  "*.pyc" "*.pyo" "*.class" "*.o" "*.a" "*.so" "*.dylib" "*.dll" "*.exe"
+  "*.jpg" "*.jpeg" "*.png" "*.gif" "*.bmp" "*.ico" "*.webp" "*.pdf"
+  "*.zip" "*.tar" "*.gz" "*.bz2" "*.xz" "*.7z" "*.jar" "*.war"
+  "*.mp3" "*.mp4" "*.mov" "*.avi" "*.wav" "*.ogg"
+  "*.woff" "*.woff2" "*.ttf" "*.otf" "*.eot"
+  "*.pkl" "*.joblib" "*.h5" "*.pt" "*.pth" "*.onnx" "*.pb" "*.tflite"
+  "*.sqlite" "*.db" "*.DS_Store"
+  package-lock.json yarn.lock pnpm-lock.yaml Pipfile.lock poetry.lock
+  composer.lock Cargo.lock Podfile.lock pubspec.lock go.sum
+)
+
+TMP_FILES=""
+TMP_EXT=""
+cleanup() { [ -n "$TMP_FILES" ] && rm -f "$TMP_FILES"; [ -n "$TMP_EXT" ] && rm -f "$TMP_EXT"; return 0; }
+trap cleanup EXIT
+
+die() { printf 'ceran-loc: %s\n' "$1" >&2; exit "${2:-$EXIT_USAGE}"; }
+
+usage() {
+  cat <<'USAGE'
+ceran-loc — proje kod satırı analizi (kod / yorum / boş ayrımıyla)
+
+KULLANIM
+  ceran-loc [SEÇENEKLER] [DİZİN]
+
+SEÇENEKLER
+  -d, --dir <dizin>        Taranacak kök dizin (varsayılan: .)
+  -e, --exclude <desen>    Ek hariç tutma deseni (tekrarlanabilir)
+                             içinde "/" varsa  → tam yola göre eşleşir
+                             glob veya "." varsa → dosya adına göre eşleşir
+                             düz sözcük ise    → dizin adı olarak eşleşir
+  -x, --ext <uzantı>       Yalnız bu uzantılar (tekrarlanabilir), örn: -x py -x go
+  -t, --top <n>            En büyük N dosyayı listele (0 = hepsi, varsayılan: 10)
+  -s, --sort <alan>        Sıralama: lines | ext | file (varsayılan: lines)
+  -g, --group <alan>       Dağılım tablosu: ext | dir (varsayılan: ext)
+      --depth <n>          --group dir için kaç yol seviyesi (varsayılan: 1)
+  -f, --format <biçim>     Çıktı: table | csv | json | md (varsayılan: table)
+  -o, --output <yol>       Çıktıyı dosyaya yaz (varsayılan: stdout)
+      --no-git             .gitignore'u dikkate alma, find ile tara
+      --include-ignored    Git modunda git'in yok saydığı dosyaları da say
+      --no-color           Renksiz çıktı
+  -q, --quiet              Yalnız genel özet
+      --max-file-lines <n>   Bir dosya n satırı aşarsa çıkış kodu 2
+      --max-total-lines <n>  Toplam kod n satırı aşarsa çıkış kodu 2
+  -h, --help               Bu yardım
+  -V, --version            Sürüm
+
+ÇIKIŞ KODLARI
+  0  başarılı · 1  kullanım/ortam hatası · 2  eşik aşıldı
+
+ÖRNEKLER
+  ceran-loc
+  ceran-loc -d ~/proje -x py -x go --top 20
+  ceran-loc --format json -o metrics.json
+  ceran-loc --group dir                         # dizin bazlı dağılım
+  ceran-loc --format md                         # README'ye gömülecek blok
+  ceran-loc --quiet --max-file-lines 500        # CI kapısı
+USAGE
+  exit 0
+}
+
+# ── Argüman ayrıştırma ────────────────────────────────────────────────────────
+parse_args() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -d|--dir)             [ $# -ge 2 ] || die "--dir bir değer ister"; ROOT_DIR="$2"; shift 2 ;;
+      -e|--exclude)         [ $# -ge 2 ] || die "--exclude bir değer ister"; EXCLUDES=(${EXCLUDES[@]+"${EXCLUDES[@]}"} "$2"); shift 2 ;;
+      -x|--ext)             [ $# -ge 2 ] || die "--ext bir değer ister"; FILTER_EXTS=(${FILTER_EXTS[@]+"${FILTER_EXTS[@]}"} "$2"); shift 2 ;;
+      -t|--top)             [ $# -ge 2 ] || die "--top bir değer ister"; TOP_N="$2"; shift 2 ;;
+      -s|--sort)            [ $# -ge 2 ] || die "--sort bir değer ister"; SORT_BY="$2"; shift 2 ;;
+      -g|--group)           [ $# -ge 2 ] || die "--group bir değer ister"; GROUP_BY="$2"; shift 2 ;;
+      --depth)              [ $# -ge 2 ] || die "--depth bir değer ister"; GROUP_DEPTH="$2"; shift 2 ;;
+      -f|--format)          [ $# -ge 2 ] || die "--format bir değer ister"; FORMAT="$2"; shift 2 ;;
+      -o|--output)          [ $# -ge 2 ] || die "--output bir değer ister"; OUTPUT="$2"; shift 2 ;;
+      --max-file-lines)     [ $# -ge 2 ] || die "--max-file-lines bir değer ister"; MAX_FILE_LINES="$2"; shift 2 ;;
+      --max-total-lines)    [ $# -ge 2 ] || die "--max-total-lines bir değer ister"; MAX_TOTAL_LINES="$2"; shift 2 ;;
+      --no-git)             USE_GIT=false; shift ;;
+      --include-ignored)    INCLUDE_IGNORED=true; shift ;;
+      --no-color)           USE_COLOR=false; shift ;;
+      -q|--quiet)           QUIET=true; shift ;;
+      --csv)                FORMAT="csv"; shift ;;   # geriye uyum: eski count_lines.sh
+      -h|--help)            usage ;;
+      -V|--version)         printf 'ceran-loc %s\n' "$VERSION"; exit 0 ;;
+      --)                   shift; [ $# -gt 0 ] && ROOT_DIR="$1"; break ;;
+      -*)                   die "bilinmeyen seçenek: $1" ;;
+      *)                    ROOT_DIR="$1"; shift ;;
+    esac
+  done
+}
+
+validate_args() {
+  [ -d "$ROOT_DIR" ] || die "'$ROOT_DIR' geçerli bir dizin değil"
+
+  case "$FORMAT" in
+    table|csv|json|md) ;;
+    *) die "bilinmeyen biçim: $FORMAT (table|csv|json|md)" ;;
+  esac
+  case "$SORT_BY" in
+    lines|ext|file) ;;
+    *) die "bilinmeyen sıralama: $SORT_BY (lines|ext|file)" ;;
+  esac
+  case "$GROUP_BY" in
+    ext|dir) ;;
+    *) die "bilinmeyen gruplama: $GROUP_BY (ext|dir)" ;;
+  esac
+  is_number "$GROUP_DEPTH" && [ "$GROUP_DEPTH" -ge 1 ] || die "--depth 1 veya daha büyük olmalı: $GROUP_DEPTH"
+  is_number "$TOP_N"            || die "--top bir tamsayı olmalı: $TOP_N"
+  is_number "$MAX_FILE_LINES"   || die "--max-file-lines bir tamsayı olmalı: $MAX_FILE_LINES"
+  is_number "$MAX_TOTAL_LINES"  || die "--max-total-lines bir tamsayı olmalı: $MAX_TOTAL_LINES"
+
+  for tool in awk sort find; do
+    command -v "$tool" >/dev/null 2>&1 || die "'$tool' komutu bulunamadı"
+  done
+}
+
+is_number() { case "$1" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+
+# realpath stock macOS'ta her sürümde yok — pwd -P her yerde var.
+abs_path() { (cd "$1" >/dev/null 2>&1 && pwd -P) || printf '%s' "$1"; }
+
+# ── Renkler ───────────────────────────────────────────────────────────────────
+setup_colors() {
+  if $USE_COLOR && [ -t 1 ] && [ -z "$OUTPUT" ]; then
+    C_RESET=$'\033[0m';   C_BOLD=$'\033[1m';    C_DIM=$'\033[2m'
+    C_CYAN=$'\033[0;36m'; C_GREEN=$'\033[0;32m'; C_YELLOW=$'\033[0;33m'
+    C_BLUE=$'\033[0;34m'; C_WHITE=$'\033[0;37m'
+  else
+    C_RESET='' C_BOLD='' C_DIM='' C_CYAN='' C_GREEN='' C_YELLOW='' C_BLUE='' C_WHITE=''
+  fi
+}
+
+# ── Dosya listesi ─────────────────────────────────────────────────────────────
+# Git deposundaysak dosya seçimini git yapar: .gitignore, .git/info/exclude ve
+# global excludesfile bedavaya gelir. Sabit exclude listesi bunu yakalayamaz —
+# eski count_lines.sh'ın her projede fork edilme sebebi buydu.
+in_git_repo() {
+  $USE_GIT || return 1
+  command -v git >/dev/null 2>&1 || return 1
+  git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
+# Her iki yol da ROOT_DIR'e GÖRELİ yol üretir; aşağısı bu değişmeze dayanır.
+# find'ı ROOT_DIR içinden koşturmak şart: "find $ROOT_DIR" mutlak yol basar,
+# tarayıcı ise ROOT_DIR'e cd'leyip göreli yol bekler.
+raw_file_list() {
+  if in_git_repo; then
+    if $INCLUDE_IGNORED; then
+      git -C "$ROOT_DIR" ls-files -z --cached --others
+    else
+      git -C "$ROOT_DIR" ls-files -z --cached --others --exclude-standard
+    fi
+  else
+    ( cd "$ROOT_DIR" && find . -type f -print0 )
+  fi
+}
+
+file_source_label() {
+  if in_git_repo; then
+    $INCLUDE_IGNORED && printf 'git (yok sayılanlar dahil)' || printf 'git (.gitignore uygulandı)'
+  else
+    printf 'find (git kullanılmadı)'
+  fi
+}
+
+# Desen anlambilimi tek yerde: hem varsayılan hem kullanıcı desenleri için aynı.
+path_excluded() {
+  local path="$1" pat base seg
+  base="${path##*/}"
+  for pat in "${DEFAULT_EXCLUDES[@]}" ${EXCLUDES[@]+"${EXCLUDES[@]}"}; do
+    case "$pat" in
+      */)
+        seg="${pat%/}"
+        case "/$path/" in */"$seg"/*) return 0 ;; esac
+        ;;
+      */*)
+        case "$path" in $pat|"$pat"/*) return 0 ;; esac
+        case "$path" in "${pat%/}"/*) return 0 ;; esac
+        ;;
+      *[*?[]*|*.*)
+        case "$base" in $pat) return 0 ;; esac
+        ;;
+      *)
+        case "/$path/" in */"$pat"/*) return 0 ;; esac
+        case "$base" in "$pat") return 0 ;; esac
+        ;;
+    esac
+  done
+  return 1
+}
+
+ext_selected() {
+  [ ${#FILTER_EXTS[@]} -eq 0 ] && return 0
+  local path="$1" base ext e
+  base="${path##*/}"
+  case "$base" in
+    *.*) ext="${base##*.}" ;;
+    *)   return 1 ;;
+  esac
+  ext=$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')
+  for e in "${FILTER_EXTS[@]}"; do
+    e="${e#.}"
+    e=$(printf '%s' "$e" | tr '[:upper:]' '[:lower:]')
+    [ "$ext" = "$e" ] && return 0
+  done
+  return 1
+}
+
+# NUL ayraçlı akışı süzer, kalanları NUL ayraçlı olarak basar.
+select_files() {
+  local f
+  while IFS= read -r -d '' f; do
+    f="${f#./}"
+    [ -n "$f" ] || continue
+    [ -f "$ROOT_DIR/$f" ] || continue
+    path_excluded "$f" && continue
+    ext_selected "$f" || continue
+    printf '%s\0' "$f"
+  done
+}
+
+# ── Tarama ────────────────────────────────────────────────────────────────────
+# Dosya başına fork YOK: tek awk süreci tüm dosyaları okur, satırları
+# kod / yorum / boş olarak sınıflar. Sınıflama sözlükseldir (parser değil):
+# dize içindeki yorum işareti yanlış sayılabilir — cloc da aynı ödünü verir.
+read -r -d '' SCAN_AWK <<'SCAN' || true
+function base_of(p,   b) { b = p; sub(/^.*\//, "", b); return b }
+
+function ext_of(b,   e) {
+  if (b ~ /^\./) {
+    e = substr(b, 2)
+    if (index(e, ".") == 0) return ""
+    sub(/^.*\./, "", e)
+    return tolower(e)
+  }
+  if (index(b, ".") == 0) return ""
+  e = b
+  sub(/^.*\./, "", e)
+  return tolower(e)
+}
+
+function style_of(b, e,   lb) {
+  lb = tolower(b)
+  if (lb in BSTYLE) return BSTYLE[lb]
+  if (e != "" && (e in STYLE)) return STYLE[e]
+  return "none"
+}
+
+function label_of(b, e,   lb) {
+  if (e != "") return "." e
+  lb = tolower(b)
+  if (lb in BSTYLE) return lb
+  return "(uzantısız)"
+}
+
+function reg(st, list,   n, a, i) {
+  n = split(list, a, ",")
+  for (i = 1; i <= n; i++) STYLE[a[i]] = st
+}
+
+function regb(st, list,   n, a, i) {
+  n = split(list, a, ",")
+  for (i = 1; i <= n; i++) BSTYLE[a[i]] = st
+}
+
+BEGIN {
+  SQ3 = sprintf("%c%c%c", 39, 39, 39)
+  DQ3 = "\"\"\""
+  CTRL = "[\001-\010\013\014\016-\037]"
+
+  reg("c",    "c,h,cpp,hpp,cc,hh,cxx,hxx,ino,java,js,jsx,mjs,cjs,ts,tsx,go,rs,swift,kt,kts,dart,cs,scala,php,m,mm,proto,gradle,groovy,glsl,hlsl,metal,sv,zig,d,adoc")
+  reg("css",  "css,scss,sass,less,styl")
+  reg("hash", "sh,bash,zsh,fish,ksh,rb,pl,pm,r,jl,yaml,yml,toml,ini,cfg,conf,tf,tfvars,mk,cmake,env,properties,ps1,psm1,nix,dockerfile,gitignore,gitattributes,editorconfig")
+  reg("py",   "py,pyi,pyx")
+  reg("sql",  "sql,psql,pgsql")
+  reg("xml",  "xml,html,htm,xhtml,vue,svelte,md,markdown,svg,plist,xaml,storyboard,xib,resx")
+  reg("lisp", "lisp,clj,cljs,cljc,edn,scm,el")
+  reg("lua",  "lua")
+  reg("vim",  "vim,vimrc")
+  reg("bat",  "bat,cmd")
+  reg("none", "txt,json,jsonc,csv,tsv,log,text,rst,lock,gradle_properties")
+
+  regb("hash", "makefile,gnumakefile,dockerfile,containerfile,jenkinsfile,vagrantfile,rakefile,gemfile,brewfile,procfile,cmakelists.txt,.gitignore,.gitattributes,.dockerignore,.editorconfig,.env")
+
+  LC1["c"]    = "//";  BS1["c"]   = "/*";  BE1["c"]   = "*/"
+  LC1["hash"] = "#"
+  LC1["py"]   = "#";   BS1["py"]  = DQ3;   BE1["py"]  = DQ3;  BS2["py"] = SQ3; BE2["py"] = SQ3
+  LC1["sql"]  = "--";  LC2["sql"] = "#";   BS1["sql"] = "/*"; BE1["sql"] = "*/"
+                       BS1["css"] = "/*";  BE1["css"] = "*/"
+                       BS1["xml"] = "<!--"; BE1["xml"] = "-->"
+  LC1["lisp"] = ";"
+  LC1["lua"]  = "--";  BS1["lua"] = "--[["; BE1["lua"] = "]]"
+  LC1["vim"]  = "\""
+  LC1["bat"]  = "::";  LC2["bat"] = "rem"
+}
+
+FNR == 1 {
+  f = FILENAME
+  bn = base_of(f)
+  ex = ext_of(bn)
+  ST[f]    = style_of(bn, ex)
+  LABEL[f] = label_of(bn, ex)
+  SEEN[f]  = 1
+  INBLOCK[f] = 0
+  if ($0 ~ CTRL) BIN[f] = 1
+}
+
+{
+  f = FILENAME
+  if (BIN[f]) next
+
+  TOT[f]++
+  line = $0
+  gsub(/^[ \t\r]+/, "", line)
+  gsub(/[ \t\r]+$/, "", line)
+
+  if (INBLOCK[f]) {
+    CMT[f]++
+    if (index(line, BEND[f]) > 0) INBLOCK[f] = 0
+    next
+  }
+
+  if (line == "") { BLK[f]++; next }
+
+  st = ST[f]
+
+  # Blok işareti satır işaretinden ÖNCE denenir: lua "--[[" hem blok başı hem
+  # "--" satır yorumu ile eşleşir; ters sırada blok hiç açılmaz ve gövdesi
+  # kod sayılırdı.
+  bs = ""; be = ""
+  if (BS1[st] != "" && index(line, BS1[st]) == 1)      { bs = BS1[st]; be = BE1[st] }
+  else if (BS2[st] != "" && index(line, BS2[st]) == 1) { bs = BS2[st]; be = BE2[st] }
+
+  if (bs != "") {
+    CMT[f]++
+    rest = substr(line, length(bs) + 1)
+    if (index(rest, be) == 0) { INBLOCK[f] = 1; BEND[f] = be }
+    next
+  }
+
+  if (LC1[st] != "" && index(line, LC1[st]) == 1) { CMT[f]++; next }
+  if (LC2[st] != "") {
+    if (st == "bat") { if (index(tolower(line), LC2[st]) == 1) { CMT[f]++; next } }
+    else if (index(line, LC2[st]) == 1) { CMT[f]++; next }
+  }
+
+  CODE[f]++
+}
+
+# Boş dosyalar ana kurala hiç girmez; kayıtları ARGV üzerinden tamamlanır.
+END {
+  for (i = 1; i < ARGC; i++) {
+    f = ARGV[i]
+    if (f == "") continue
+    if (BIN[f]) continue
+    if (!(f in SEEN)) {
+      bn = base_of(f)
+      LABEL[f] = label_of(bn, ext_of(bn))
+    }
+    out = f
+    sub(/^\.\//, "", out)
+    printf "%d\t%d\t%d\t%d\t%s\t%s\n", \
+      CODE[f] + 0, CMT[f] + 0, BLK[f] + 0, TOT[f] + 0, LABEL[f], out
+  }
+}
+SCAN
+
+scan_files() {
+  # Boş listede xargs komutu yine de bir kez çalıştırır; awk o zaman stdin'i
+  # okumaya oturur ve asılır. Erken dön.
+  [ -s "$1" ] || return 0
+
+  # awk "ad=değer" biçimli argümanı atama sayar. "./" öneki bunu imkânsız kılar
+  # (./x geçerli bir değişken adı değildir) ve kayıt basılırken geri soyulur.
+  ( cd "$ROOT_DIR" && tr '\0' '\n' < "$1" | sed 's|^|./|' | tr '\n' '\0' \
+      | xargs -0 awk "$SCAN_AWK" 2>/dev/null ) || true
+}
+
+# ── Toplama ───────────────────────────────────────────────────────────────────
+# Dağılım tablosunun anahtarı: uzantı (alan 5) ya da yolun ilk N seviyesi.
+aggregate() {
+  awk -F'\t' -v mode="$GROUP_BY" -v depth="$GROUP_DEPTH" '
+    function dirkey(path,   n, a, i, k) {
+      n = split(path, a, "/")
+      if (n <= 1) return "(kök)"
+      k = a[1]
+      for (i = 2; i <= depth && i < n; i++) k = k "/" a[i]
+      return k
+    }
+    {
+      key = (mode == "dir") ? dirkey($6) : $5
+      code[key] += $1; cmt[key] += $2; blk[key] += $3; tot[key] += $4; n[key]++
+    }
+    END { for (e in code) printf "%s\t%d\t%d\t%d\t%d\t%d\n", e, code[e], cmt[e], blk[e], tot[e], n[e] }
+  ' "$1" | sort -t"$(printf '\t')" -k2,2nr -k1,1
+}
+
+sum_column() { awk -F'\t' -v c="$1" '{ s += $c } END { print s + 0 }' "$2"; }
+
+sorted_files() {
+  local tab
+  tab=$(printf '\t')
+  case "$SORT_BY" in
+    ext)  sort -t"$tab" -k5,5 -k1,1nr "$1" ;;
+    file) sort -t"$tab" -k6,6 "$1" ;;
+    *)    sort -t"$tab" -k1,1nr -k4,4nr "$1" ;;
+  esac
+}
+
+# ── Çıktı biçimleri ───────────────────────────────────────────────────────────
+emit_csv() {
+  printf 'code,comment,blank,total,extension,file\n'
+  sorted_files "$TMP_FILES" | awk -F'\t' '
+    function q(s) { gsub(/"/, "\"\"", s); return "\"" s "\"" }
+    { printf "%d,%d,%d,%d,%s,%s\n", $1, $2, $3, $4, q($5), q($6) }
+  '
+}
+
+emit_json() {
+  local total_code total_cmt total_blk total_tot total_files
+  total_code=$(sum_column 1 "$TMP_FILES")
+  total_cmt=$(sum_column 2 "$TMP_FILES")
+  total_blk=$(sum_column 3 "$TMP_FILES")
+  total_tot=$(sum_column 4 "$TMP_FILES")
+  total_files=$(awk 'END { print NR + 0 }' "$TMP_FILES")
+
+  printf '{\n'
+  printf '  "tool": "ceran-loc",\n'
+  printf '  "version": "%s",\n' "$VERSION"
+  printf '  "root": "%s",\n' "$(json_escape "$(abs_path "$ROOT_DIR")")"
+  printf '  "source": "%s",\n' "$(json_escape "$(file_source_label)")"
+  printf '  "summary": { "files": %d, "code": %d, "comment": %d, "blank": %d, "total": %d },\n' \
+    "$total_files" "$total_code" "$total_cmt" "$total_blk" "$total_tot"
+
+  # Anahtar adı gruplamaya göre değişir; "by_extension" v1.0.0 şemasıyla
+  # uyumlu kalır, "by_directory" yalnız --group dir ile eklenir (additive).
+  local group_key group_field
+  if [ "$GROUP_BY" = "dir" ]; then
+    group_key="by_directory"; group_field="directory"
+  else
+    group_key="by_extension"; group_field="extension"
+  fi
+
+  printf '  "grouping": "%s",\n' "$GROUP_BY"
+  printf '  "%s": [\n' "$group_key"
+  aggregate "$TMP_FILES" | awk -F'\t' -v field="$group_field" '
+    function esc(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); return s }
+    {
+      if (NR > 1) printf ",\n"
+      printf "    { \"%s\": \"%s\", \"files\": %d, \"code\": %d, \"comment\": %d, \"blank\": %d, \"total\": %d }",
+        field, esc($1), $6, $2, $3, $4, $5
+    }
+    END { if (NR > 0) printf "\n" }
+  '
+  printf '  ],\n'
+
+  printf '  "files": [\n'
+  sorted_files "$TMP_FILES" | awk -F'\t' '
+    function esc(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); return s }
+    {
+      if (NR > 1) printf ",\n"
+      printf "    { \"file\": \"%s\", \"extension\": \"%s\", \"code\": %d, \"comment\": %d, \"blank\": %d, \"total\": %d }",
+        esc($6), esc($5), $1, $2, $3, $4
+    }
+    END { if (NR > 0) printf "\n" }
+  '
+  printf '  ]\n'
+  printf '}\n'
+}
+
+json_escape() { printf '%s' "$1" | awk '{ gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); printf "%s", $0 }'; }
+
+# README'ye gömülmek için tasarlandı: kompakt, sabit yapılı, işaretçilerle
+# sarılı. İşaretçiler bloğun yerini belirler — üreten taraf onu bulup
+# değiştirebilsin diye (aksi halde her koşuda README'ye yeni bölüm eklenirdi).
+# `--top` burada yok sayılır: 130 repoya dosya listesi basmak README'yi şişirir.
+emit_md() {
+  local total_code total_cmt total_blk total_tot total_files
+  total_code=$(sum_column 1 "$TMP_FILES")
+  total_cmt=$(sum_column 2 "$TMP_FILES")
+  total_blk=$(sum_column 3 "$TMP_FILES")
+  total_tot=$(sum_column 4 "$TMP_FILES")
+  total_files=$(awk 'END { print NR + 0 }' "$TMP_FILES")
+
+  local head_label
+  [ "$GROUP_BY" = "dir" ] && head_label="Dizin" || head_label="Uzantı"
+
+  local excl_note=""
+  [ ${#EXCLUDES[@]} -gt 0 ] && excl_note="$(join_by ', ' "${EXCLUDES[@]}")"
+  [ ${#FILTER_EXTS[@]} -gt 0 ] && excl_note="${excl_note:+$excl_note · }yalnız: $(join_by ', ' "${FILTER_EXTS[@]}")"
+
+  printf '%s\n' "$MD_START"
+  awk -v ver="$VERSION" -v today="$(date +%Y-%m-%d)" -v src="$(file_source_label)" \
+      -v files="$total_files" -v code="$total_code" -v cmt="$total_cmt" \
+      -v blk="$total_blk" -v tot="$total_tot" -v excl="$excl_note" "$THOUSANDS_AWK"'
+    BEGIN {
+      printf "> Kaynak: `ceran-loc v%s` · %s · %s\n", ver, src, today
+      # Neyin dışarıda bırakıldığı tabloyla birlikte görünmeli; aksi halde
+      # sayı, kapsamı gizleyerek doğru görünür.
+      if (excl != "") printf "> Hariç: %s\n", excl
+      printf "\n"
+      printf "| Dosya | Kod | Yorum | Boş | Toplam |\n"
+      printf "|---:|---:|---:|---:|---:|\n"
+      printf "| %s | **%s** | %s | %s | %s |\n\n", th(files), th(code), th(cmt), th(blk), th(tot)
+    }'
+
+  printf '| %s | Kod | Yorum | Boş | Dosya | Pay |\n' "$head_label"
+  printf '|---|---:|---:|---:|---:|---:|\n'
+  aggregate "$TMP_FILES" | awk -F'\t' -v total="$total_code" "$THOUSANDS_AWK"'
+    # İlk 10 grup satır satır; kuyruk tek "diğer" satırında toplanır ki
+    # 40 uzantılı bir repo README\x27i ele geçirmesin.
+    NR <= 10 {
+      pct = (total > 0) ? int($2 * 100 / total) : 0
+      printf "| `%s` | %s | %s | %s | %s | %%%d |\n", $1, th($2), th($3), th($4), th($6), pct
+      next
+    }
+    { rc += $2; rm += $3; rb += $4; rf += $6; n++ }
+    END {
+      if (n > 0) {
+        pct = (total > 0) ? int(rc * 100 / total) : 0
+        printf "| _diğer (%d)_ | %s | %s | %s | %s | %%%d |\n", n, th(rc), th(rm), th(rb), th(rf), pct
+      }
+    }
+  '
+  printf '%s\n' "$MD_END"
+}
+
+# Türkçe başlıklar ("Uzantı", "Boş") çok baytlıdır; printf ise BAYTA göre
+# doldurur, dolayısıyla %-16s ile sütunlar kayar. Genişlik hesabı UTF-8
+# devam baytları atılarak yapılır — hem bayt tabanlı awk hem karakter tabanlı
+# gawk için doğru sonucu verir.
+# Binlik ayracı yalnız markdown çıktısında: README'yi insan okur, 128425 yerine
+# 128.425 gerekir. csv/json makine arayüzüdür, orada ham sayı kalır.
+readonly THOUSANDS_AWK='
+function th(n,   s, out, i, c, k) {
+  s = sprintf("%d", n)
+  out = ""
+  k = 0
+  for (i = length(s); i >= 1; i--) {
+    c = substr(s, i, 1)
+    out = c out
+    k++
+    if (k % 3 == 0 && i > 1) out = "." out
+  }
+  return out
+}
+'
+
+readonly UTF_AWK='
+function ulen(s)      { gsub(/[\200-\277]/, "", s); return length(s) }
+function upad(s, w,   r, n) { r = s; n = ulen(s); while (n < w) { r = r " "; n++ } return r }
+function ulpad(s, w,  r, n) { r = s; n = ulen(s); while (n < w) { r = " " r; n++ } return r }
+function rule(ch, w,  s, i) { s = ""; for (i = 0; i < w; i++) s = s ch; return s }
+'
+
+emit_table() {
+  local total_code total_cmt total_blk total_tot total_files
+  total_code=$(sum_column 1 "$TMP_FILES")
+  total_cmt=$(sum_column 2 "$TMP_FILES")
+  total_blk=$(sum_column 3 "$TMP_FILES")
+  total_tot=$(sum_column 4 "$TMP_FILES")
+  total_files=$(awk 'END { print NR + 0 }' "$TMP_FILES")
+
+  local extra_excludes="" ext_filter=""
+  [ ${#EXCLUDES[@]} -gt 0 ]    && extra_excludes=$(join_by ', ' "${EXCLUDES[@]}")
+  [ ${#FILTER_EXTS[@]} -gt 0 ] && ext_filter=$(join_by ', ' "${FILTER_EXTS[@]}")
+
+  awk -v root="$(abs_path "$ROOT_DIR")" -v src="$(file_source_label)" -v ver="$VERSION" \
+      -v files="$total_files" -v code="$total_code" -v cmt="$total_cmt" \
+      -v blk="$total_blk" -v tot="$total_tot" \
+      -v excl="$extra_excludes" -v xfilter="$ext_filter" \
+      -v cr="$C_RESET" -v cb="$C_BOLD" -v cd="$C_DIM" -v cc="$C_CYAN" \
+      -v cg="$C_GREEN" -v cy="$C_YELLOW" -v cw="$C_WHITE" \
+      "$UTF_AWK"'
+      BEGIN {
+        thick = rule("═", 72)
+        thin  = rule("─", 72)
+        printf "\n%s%s%s\n", cb, thick, cr
+        printf "%s%s  📊  KOD SATIRI ANALİZİ%s  %sceran-loc v%s%s\n", cb, cc, cr, cd, ver, cr
+        printf "%s  Dizin:  %s%s\n", cd, root, cr
+        printf "%s  Kaynak: %s%s\n", cd, src, cr
+        printf "%s%s%s\n", cb, thick, cr
+
+        printf "\n%s  GENEL ÖZET%s\n", cb, cr
+        printf "  %s%s%s\n", cd, rule("─", 70), cr
+        printf "  %s%s%s %s%s%s\n", cw, upad("Dosya",  20), cr, cy, ulpad(files, 10), cr
+        printf "  %s%s%s %s%s%s%s\n", cw, upad("Kod",  20), cr, cg, cb, ulpad(code, 10), cr
+        printf "  %s%s%s %s%s%s\n", cw, upad("Yorum",  20), cr, cc, ulpad(cmt, 10), cr
+        printf "  %s%s%s %s%s%s\n", cw, upad("Boş",    20), cr, cd, ulpad(blk, 10), cr
+        printf "  %s%s%s %s\n",     cw, upad("Toplam", 20), cr, ulpad(tot, 10)
+
+        if (excl    != "") printf "\n  %sEk hariç desenler: %s%s\n", cd, excl, cr
+        if (xfilter != "") printf "  %sUzantı filtresi: %s%s\n", cd, xfilter, cr
+      }'
+
+  if $QUIET; then
+    awk -v cb="$C_BOLD" -v cr="$C_RESET" "$UTF_AWK"'BEGIN { printf "\n%s%s%s\n\n", cb, rule("═", 72), cr }'
+    return 0
+  fi
+
+  local group_title group_head group_width
+  if [ "$GROUP_BY" = "dir" ]; then
+    group_title="DİZİN BAZLI DAĞILIM"; group_head="Dizin"; group_width=30
+  else
+    group_title="DOSYA TÜRÜ BAZLI DAĞILIM"; group_head="Uzantı"; group_width=15
+  fi
+
+  aggregate "$TMP_FILES" | awk -F'\t' \
+    -v total="$total_code" -v cr="$C_RESET" -v cb="$C_BOLD" -v cc="$C_CYAN" \
+    -v cg="$C_GREEN" -v cd="$C_DIM" -v cy="$C_YELLOW" -v cbl="$C_BLUE" \
+    -v title="$group_title" -v head="$group_head" -v gw="$group_width" \
+    "$UTF_AWK"'
+    BEGIN {
+      thin = rule("─", 70)
+      printf "\n%s  %s%s\n", cb, title, cr
+      printf "  %s%s%s\n", cd, thin, cr
+      printf "  %s%s %s %s %s %s %s%s\n", cb, upad(head, gw), ulpad("Kod", 8),
+        ulpad("Yorum", 8), ulpad("Boş", 8), ulpad("Dosya", 6), ulpad("Pay", 5), cr
+      printf "  %s%s%s\n", cd, thin, cr
+    }
+    {
+      pct = (total > 0) ? int($2 * 100 / total) : 0
+      bar = ""
+      for (i = 0; i < int(pct / 5); i++) bar = bar "█"
+      printf "  %s%s%s %s%s%s %s%s%s %s%s%s %s %s%s%s  %s%s%s\n",
+        cc, upad($1, gw), cr,
+        cg, ulpad($2, 8), cr,
+        cd, ulpad($3, 8), cr,
+        cd, ulpad($4, 8), cr,
+        ulpad($6, 6),
+        cy, ulpad(pct "%", 5), cr,
+        cbl, bar, cr
+    }
+  '
+
+  local limit="$TOP_N" shown="$TOP_N"
+  if [ "$TOP_N" -eq 0 ]; then
+    shown="TÜM"
+    limit=$(awk 'END { print NR + 0 }' "$TMP_FILES")
+  fi
+
+  sorted_files "$TMP_FILES" | head -n "$limit" | awk -F'\t' \
+    -v shown="$shown" -v sortby="$SORT_BY" -v cr="$C_RESET" -v cb="$C_BOLD" \
+    -v cg="$C_GREEN" -v cd="$C_DIM" -v cw="$C_WHITE" \
+    "$UTF_AWK"'
+    BEGIN {
+      thin = rule("─", 70)
+      printf "\n%s  EN BÜYÜK %s DOSYA%s %s(sıralama: %s)%s\n", cb, shown, cr, cd, sortby, cr
+      printf "  %s%s%s\n", cd, thin, cr
+      printf "  %s%s%s%s  %s%s\n", cb, ulpad("Kod", 8), ulpad("Yorum", 9), ulpad("Boş", 9), "Dosya", cr
+      printf "  %s%s%s\n", cd, thin, cr
+    }
+    {
+      printf "  %s%s%s %s%s%s %s%s%s  %s%s%s\n",
+        cg, ulpad($1, 8), cr, cd, ulpad($2, 8), cr, cd, ulpad($3, 8), cr, cw, $6, cr
+    }
+    END {
+      printf "\n%s%s%s\n\n", cb, rule("═", 72), cr
+    }
+  '
+}
+
+join_by() {
+  local sep="$1"; shift
+  local out="" item
+  for item in "$@"; do
+    [ -z "$out" ] && out="$item" || out="$out$sep$item"
+  done
+  printf '%s' "$out"
+}
+
+# ── Eşik kapısı ───────────────────────────────────────────────────────────────
+check_thresholds() {
+  local violated=0 offenders total_code
+
+  if [ "$MAX_FILE_LINES" -gt 0 ]; then
+    offenders=$(awk -F'\t' -v m="$MAX_FILE_LINES" '$4 > m { printf "  %s (%d satır)\n", $6, $4 }' "$TMP_FILES" | sort)
+    if [ -n "$offenders" ]; then
+      printf 'ceran-loc: %s satır sınırını aşan dosyalar (--max-file-lines %s):\n' \
+        "$MAX_FILE_LINES" "$MAX_FILE_LINES" >&2
+      printf '%s\n' "$offenders" >&2
+      violated=1
+    fi
+  fi
+
+  if [ "$MAX_TOTAL_LINES" -gt 0 ]; then
+    total_code=$(sum_column 1 "$TMP_FILES")
+    if [ "$total_code" -gt "$MAX_TOTAL_LINES" ]; then
+      printf 'ceran-loc: toplam kod %s satır, sınır %s (--max-total-lines)\n' \
+        "$total_code" "$MAX_TOTAL_LINES" >&2
+      violated=1
+    fi
+  fi
+
+  return "$violated"
+}
+
+# ── Ana akış ──────────────────────────────────────────────────────────────────
+main() {
+  parse_args "$@"
+  validate_args
+  setup_colors
+
+  TMP_FILES=$(mktemp "${TMPDIR:-/tmp}/ceran-loc.XXXXXX")
+  TMP_EXT=$(mktemp "${TMPDIR:-/tmp}/ceran-loc.XXXXXX")
+
+  raw_file_list | select_files > "$TMP_EXT"
+
+  # Boş ağaçta da GEÇERLİ bir rapor üret. Erken çıkmak, json/csv/md tüketen
+  # tarafa hiçbir şey vermemek demekti — boş repo ile hata ayırt edilemiyordu.
+  [ -s "$TMP_EXT" ] || printf 'ceran-loc: eşleşen dosya yok (%s)\n' \
+    "$(abs_path "$ROOT_DIR")" >&2
+
+  scan_files "$TMP_EXT" > "$TMP_FILES"
+
+  local render
+  case "$FORMAT" in
+    csv)  render=emit_csv ;;
+    json) render=emit_json ;;
+    md)   render=emit_md ;;
+    *)    render=emit_table ;;
+  esac
+
+  if [ -n "$OUTPUT" ]; then
+    "$render" > "$OUTPUT"
+    printf 'ceran-loc: %s yazıldı (%s)\n' "$OUTPUT" "$FORMAT" >&2
+  else
+    "$render"
+  fi
+
+  check_thresholds || exit "$EXIT_THRESHOLD"
+}
+
+main "$@"

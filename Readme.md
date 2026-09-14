@@ -1,3 +1,5 @@
+> **Arşivlendi (Eylül 2026).** Bu repo GitHub'da pull request açmayı öğrenmek için kullanılıyordu; artık yeni PR kabul etmiyor. Açık PR'lar pratik amaçlıydı, teşekkürler herkese.
+
 ﻿# Cobanov-Team Contributions
  ## Arkadaşlar daha fazla pr kabul edemiyorum çok arttı, haliyle öncekilerle conflict oluyor, otomatize etmek isteyen biri varsa benimle iletişime gecebilir 😅
 
